@@ -1,0 +1,12 @@
+{
+  "train_count": 89996,
+  "validation_count": 10004,
+  "test_count": 7180,
+  "dtype": "float32",
+  "pixel_range": [
+    0.0,
+    1.0
+  ],
+  "shape": "28x28x3",
+  "execution_time_seconds": 4.159
+}

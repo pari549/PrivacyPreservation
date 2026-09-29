@@ -1,0 +1,94 @@
+# Python environments, bytecode, and tool caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+.cache/
+
+# Local environment files and credentials
+.env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+*.token
+*.p12
+*.pfx
+*.secret
+credentials/
+credentials.*
+*_credentials.*
+secrets/
+
+# Large source datasets and generated data products
+/data/raw/**
+/data/processed/**
+/data/recoverable/**
+/data/non_recoverable/**
+/data/recovered/**
+!/data/raw/.gitkeep
+!/data/processed/.gitkeep
+!/data/recoverable/.gitkeep
+!/data/non_recoverable/.gitkeep
+!/data/recovered/.gitkeep
+
+# Cryptographic key material must be distributed securely, never via Git
+/keys/*
+!/keys/.gitkeep
+!/keys/key_metadata.json
+
+# Model weights and local caches
+/models/**
+!/models/.gitkeep
+/cache/**
+!/cache/.gitkeep
+
+# Runtime logs and bulky experiment artifacts
+/results/logs/**
+!/results/logs/.gitkeep
+/results/**/runs/
+/results/**/checkpoints/
+/results/**/artifacts/
+/results/**/*.npy
+/results/**/*.npz
+/results/**/*.pt
+/results/**/*.pth
+/results/**/*.ckpt
+/results/**/*.h5
+/results/**/*.hdf5
+/results/**/*.safetensors
+/results/**/*.onnx
+/results/**/*.csv
+/results/**/*.parquet
+/results/**/*.feather
+/results/**/*.pkl
+/results/**/*.pickle
+/results/**/faiss_index/
+/results/**/vector_store/
+*.faiss
+*.index
+*.log
+
+# Editor and operating system files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.temp
+
+# Docker local overrides and state
+docker-compose.override.yml
+.docker/

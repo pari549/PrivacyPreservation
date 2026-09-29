@@ -1,0 +1,13 @@
+{
+  "dataset": "PathMNIST",
+  "status": "verified",
+  "train": 89996,
+  "validation": 10004,
+  "test": 7180,
+  "image_size": "28x28",
+  "channels": "RGB",
+  "classes": 9,
+  "package_version": "3.0.2",
+  "download_timestamp": "2026-09-25T15:28:19.802964Z",
+  "sample_hash": "1b1e24cb98a0ba432a6a5868d5049382cd2e569cd219af080fea433aef6d80d1"
+}

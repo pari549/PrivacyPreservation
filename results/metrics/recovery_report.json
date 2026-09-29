@@ -1,0 +1,7 @@
+{
+  "ssim": 1.0,
+  "psnr": "Infinity",
+  "mse": 0.0,
+  "recovery_rate": 100.0,
+  "metadata_verified": true
+}

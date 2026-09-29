@@ -1,0 +1,1 @@
+﻿"""Optimization convergence tracking placeholder."""

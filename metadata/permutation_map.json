@@ -1,0 +1,646 @@
+{
+  "algorithm": "HMAC-SHA256 priority-weighted deterministic permutation",
+  "block_size": 4,
+  "grid_size": 7,
+  "total_blocks": 49,
+  "key_bits": 128,
+  "mappings": [
+    {
+      "block_id": 0,
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        6,
+        1
+      ],
+      "priority": 0.31524531467446487,
+      "checksum": "8a89e47713bcde98f2d5c374099d8fb701410cf764836f76da0ce3d711d0df0c"
+    },
+    {
+      "block_id": 1,
+      "from": [
+        0,
+        1
+      ],
+      "to": [
+        2,
+        1
+      ],
+      "priority": 0.2613826192057166,
+      "checksum": "691951b784bcd25446d38279965e091d085afe0c08b53dfa7389138dd78e50e3"
+    },
+    {
+      "block_id": 2,
+      "from": [
+        0,
+        2
+      ],
+      "to": [
+        5,
+        3
+      ],
+      "priority": 0.20207253249705698,
+      "checksum": "7621dc63852a247fca218e8521ef3d3329a0980f58d5a9d77ea5ee815962e8d7"
+    },
+    {
+      "block_id": 3,
+      "from": [
+        0,
+        3
+      ],
+      "to": [
+        6,
+        2
+      ],
+      "priority": 0.31000071705005305,
+      "checksum": "eb29b7e5b72953df9d1d9007c9acd332ef9160b355997fab656aa86d4661f8f4"
+    },
+    {
+      "block_id": 4,
+      "from": [
+        0,
+        4
+      ],
+      "to": [
+        6,
+        4
+      ],
+      "priority": 0.3217785422900258,
+      "checksum": "f5b68f628757bce3ff519a0fa275e15173071eea2d82d0084466ac6f859c0353"
+    },
+    {
+      "block_id": 5,
+      "from": [
+        0,
+        5
+      ],
+      "to": [
+        3,
+        1
+      ],
+      "priority": 0.444626151840873,
+      "checksum": "dc1047dc5572d775edaaa901775a80a6145e0a5ba2d8cfd43dbace2b810a04bd"
+    },
+    {
+      "block_id": 6,
+      "from": [
+        0,
+        6
+      ],
+      "to": [
+        3,
+        0
+      ],
+      "priority": 0.40941904638798665,
+      "checksum": "4ab2d0c36b6e5b2137a64131a0ab2a6ed99bb356b567be4a7496c3ac00e8805e"
+    },
+    {
+      "block_id": 7,
+      "from": [
+        1,
+        0
+      ],
+      "to": [
+        1,
+        5
+      ],
+      "priority": 0.310447136357041,
+      "checksum": "bb8d5c2aafd6b37e5b96f98ce6c06b16aee370ec399f95dd921c344c967fe80b"
+    },
+    {
+      "block_id": 8,
+      "from": [
+        1,
+        1
+      ],
+      "to": [
+        0,
+        3
+      ],
+      "priority": 0.3411367406747454,
+      "checksum": "18946de658cf44d9eb89d6a4b4bd2547d9493079a724818f33168ed12551fa2e"
+    },
+    {
+      "block_id": 9,
+      "from": [
+        1,
+        2
+      ],
+      "to": [
+        3,
+        6
+      ],
+      "priority": 0.32972196815422344,
+      "checksum": "96c434e261e0ef7cd4d5dd66cbf774b11d5a8ca16f4187b6c1ccce226d38e29e"
+    },
+    {
+      "block_id": 10,
+      "from": [
+        1,
+        3
+      ],
+      "to": [
+        2,
+        2
+      ],
+      "priority": 0.4071198453916413,
+      "checksum": "2ea58255a01a6ad61db1c910bc5305e9eb3ecb9637eee3956c923e9bb60cabc4"
+    },
+    {
+      "block_id": 11,
+      "from": [
+        1,
+        4
+      ],
+      "to": [
+        5,
+        1
+      ],
+      "priority": 0.4398002140310397,
+      "checksum": "75681e078fca4b9d43520857c6debb14e3182cb57af84a3e280281bcdd3f9877"
+    },
+    {
+      "block_id": 12,
+      "from": [
+        1,
+        5
+      ],
+      "to": [
+        4,
+        1
+      ],
+      "priority": 0.41112453029650936,
+      "checksum": "b4cdb7c7e87d4f8c5018543ec23aa80678ca25210aa7b6a3de45c91447c9d1ca"
+    },
+    {
+      "block_id": 13,
+      "from": [
+        1,
+        6
+      ],
+      "to": [
+        4,
+        2
+      ],
+      "priority": 0.5201855648030366,
+      "checksum": "0ca0aed28f7f635170cd81546759e55912ee9cec98f94d449162678161a69ec6"
+    },
+    {
+      "block_id": 14,
+      "from": [
+        2,
+        0
+      ],
+      "to": [
+        0,
+        5
+      ],
+      "priority": 0.4418018588913935,
+      "checksum": "0ee2ccb4dd66cfe8a3040ca5d6608305914b1c788f76b63f3a7a2ca3897ce653"
+    },
+    {
+      "block_id": 15,
+      "from": [
+        2,
+        1
+      ],
+      "to": [
+        6,
+        0
+      ],
+      "priority": 0.40442069824361,
+      "checksum": "1ea2e9093a815b643f8035c1e0a643356f40714fdf77a0e1c052268461121cdf"
+    },
+    {
+      "block_id": 16,
+      "from": [
+        2,
+        2
+      ],
+      "to": [
+        0,
+        4
+      ],
+      "priority": 0.4441396652812866,
+      "checksum": "ae4e08d766e7b5e1f2623cbf0e608d52b272d0fd401ea9c5463a28b359bc261d"
+    },
+    {
+      "block_id": 17,
+      "from": [
+        2,
+        3
+      ],
+      "to": [
+        4,
+        6
+      ],
+      "priority": 0.3740110631445556,
+      "checksum": "d7f938bad3cf0131a55a0804b26d5f612d715b2ca41fb0c1a10f0e1b538cd9b2"
+    },
+    {
+      "block_id": 18,
+      "from": [
+        2,
+        4
+      ],
+      "to": [
+        5,
+        2
+      ],
+      "priority": 0.29892403933436973,
+      "checksum": "f5b71136528efb90f17bb8df967586ee7cd5ffb1a97830dbe6fcaf7a4c66cc04"
+    },
+    {
+      "block_id": 19,
+      "from": [
+        2,
+        5
+      ],
+      "to": [
+        1,
+        2
+      ],
+      "priority": 0.261802094043847,
+      "checksum": "eac345ae8a9cdb52bee003af3a2582f5afe907b9cfe44096cdafb1b62586d893"
+    },
+    {
+      "block_id": 20,
+      "from": [
+        2,
+        6
+      ],
+      "to": [
+        4,
+        0
+      ],
+      "priority": 0.25421784233240685,
+      "checksum": "a3a8bdb0d067fd11996c9ef50623efaf89ebb3534cf9e9b6606e207bb3cdaa1f"
+    },
+    {
+      "block_id": 21,
+      "from": [
+        3,
+        0
+      ],
+      "to": [
+        0,
+        6
+      ],
+      "priority": 0.34667844463916697,
+      "checksum": "9ebb8203881e294abaa5641196d2ead87de0334941804e35d50abec757c02bb3"
+    },
+    {
+      "block_id": 22,
+      "from": [
+        3,
+        1
+      ],
+      "to": [
+        4,
+        5
+      ],
+      "priority": 0.3301444203204854,
+      "checksum": "bf6d8d0298e0f1ef4237fe4a25b471734f7165ae576a52172d6f82506db78cf1"
+    },
+    {
+      "block_id": 23,
+      "from": [
+        3,
+        2
+      ],
+      "to": [
+        1,
+        4
+      ],
+      "priority": 0.2969726849643843,
+      "checksum": "97ebaeba37093b435adb77345b25df8e7f21f16375e14c7472b769d4b9ed1d8f"
+    },
+    {
+      "block_id": 24,
+      "from": [
+        3,
+        3
+      ],
+      "to": [
+        5,
+        6
+      ],
+      "priority": 0.2923117150417267,
+      "checksum": "a07d1b93e1e8e87618c8ba88844c2dbfe5487cd317462e718a087157e6d10ffc"
+    },
+    {
+      "block_id": 25,
+      "from": [
+        3,
+        4
+      ],
+      "to": [
+        4,
+        4
+      ],
+      "priority": 0.26212375667717397,
+      "checksum": "6ea89a7dab71ae6cc4d9c6bb1f7b613f18f2e11ddac4c35b3032157a822b4980"
+    },
+    {
+      "block_id": 26,
+      "from": [
+        3,
+        5
+      ],
+      "to": [
+        6,
+        3
+      ],
+      "priority": 0.27121639830515915,
+      "checksum": "40d10a677eeb6ae4f8a4e2f9c33732d7fd9a26a163abb8e81c2e15a564ef0759"
+    },
+    {
+      "block_id": 27,
+      "from": [
+        3,
+        6
+      ],
+      "to": [
+        6,
+        5
+      ],
+      "priority": 0.2887432162882966,
+      "checksum": "b7cffc5a3d0ade12107a4103eb784ef8984b0fd8cac10a23354fa60a1beff89a"
+    },
+    {
+      "block_id": 28,
+      "from": [
+        4,
+        0
+      ],
+      "to": [
+        5,
+        4
+      ],
+      "priority": 0.2834967949534748,
+      "checksum": "c16c80d27ebeb7001c7e12a939c55ab3911cdea67eaf7358ba25fc7014f892b8"
+    },
+    {
+      "block_id": 29,
+      "from": [
+        4,
+        1
+      ],
+      "to": [
+        2,
+        4
+      ],
+      "priority": 0.3681718956866234,
+      "checksum": "1806f9bf990074a36ef9f854728c633bfa2092d8ecf6342b1c10f3f43b18dca8"
+    },
+    {
+      "block_id": 30,
+      "from": [
+        4,
+        2
+      ],
+      "to": [
+        1,
+        3
+      ],
+      "priority": 0.31050346765155534,
+      "checksum": "74fc725db47b5550b59691c216ea7af2c7ed7362c57abdae9b92c45de78ea06a"
+    },
+    {
+      "block_id": 31,
+      "from": [
+        4,
+        3
+      ],
+      "to": [
+        3,
+        5
+      ],
+      "priority": 0.29684567341684076,
+      "checksum": "df3e2315c54bde6c383d51806eafe1f53387bb130f00e71e533528fb29a95789"
+    },
+    {
+      "block_id": 32,
+      "from": [
+        4,
+        4
+      ],
+      "to": [
+        5,
+        0
+      ],
+      "priority": 0.2588369059069658,
+      "checksum": "5bd9022bc6a94f10d7baef8f69e909f30c88bff1d22ae0b442e2943227061147"
+    },
+    {
+      "block_id": 33,
+      "from": [
+        4,
+        5
+      ],
+      "to": [
+        2,
+        0
+      ],
+      "priority": 0.305627445103766,
+      "checksum": "a4f0d59b84927a59ee1a573442c1a1ea5dae06907296992d84aa2e94193fd4f8"
+    },
+    {
+      "block_id": 34,
+      "from": [
+        4,
+        6
+      ],
+      "to": [
+        1,
+        6
+      ],
+      "priority": 0.30959501990934163,
+      "checksum": "26ef4349949e8f63c141ef54a13209297208dcdfcc753fd1121df55dfb2f4b2b"
+    },
+    {
+      "block_id": 35,
+      "from": [
+        5,
+        0
+      ],
+      "to": [
+        4,
+        3
+      ],
+      "priority": 0.41669632526228856,
+      "checksum": "672a9e94542509f760ca8f10a87830f53c05f310271376d7c6100a7f195851fc"
+    },
+    {
+      "block_id": 36,
+      "from": [
+        5,
+        1
+      ],
+      "to": [
+        0,
+        0
+      ],
+      "priority": 0.254365610112973,
+      "checksum": "0cc63de8f83df536b8fb070db2a580a90dec25a515721aa1896963f8c876b31e"
+    },
+    {
+      "block_id": 37,
+      "from": [
+        5,
+        2
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "priority": 0.3120475657693529,
+      "checksum": "e8c804d7f57fde6fc9806cfe40d1e7025a0f89093695004812da43568af111b4"
+    },
+    {
+      "block_id": 38,
+      "from": [
+        5,
+        3
+      ],
+      "to": [
+        2,
+        3
+      ],
+      "priority": 0.31571091564283504,
+      "checksum": "5f19f3e62968d2e06e379347cea5a267d10f30f14c20fa66cb85b3e4cfee0f95"
+    },
+    {
+      "block_id": 39,
+      "from": [
+        5,
+        4
+      ],
+      "to": [
+        1,
+        0
+      ],
+      "priority": 0.30045642637878306,
+      "checksum": "9200128b3f75b7dfbdb68b62da236f5b6bec08b4c60d4ba295acd8231683cbec"
+    },
+    {
+      "block_id": 40,
+      "from": [
+        5,
+        5
+      ],
+      "to": [
+        2,
+        6
+      ],
+      "priority": 0.32037399995572147,
+      "checksum": "1dfc26991ef9b0ec99dc53796f1cc0e59098c8a6d363f2a26846ce5e8d8cb3a7"
+    },
+    {
+      "block_id": 41,
+      "from": [
+        5,
+        6
+      ],
+      "to": [
+        3,
+        2
+      ],
+      "priority": 0.28993645009907115,
+      "checksum": "85e051c9cc6a04cb4a44df09299f6b41d7b1a5a06de34e8a8df1750f175ab069"
+    },
+    {
+      "block_id": 42,
+      "from": [
+        6,
+        0
+      ],
+      "to": [
+        0,
+        2
+      ],
+      "priority": 0.3898801829406478,
+      "checksum": "2e5d86b32eb86d381dbd6ca308649cc267fbafe0b2f0e4a81afd7186574da215"
+    },
+    {
+      "block_id": 43,
+      "from": [
+        6,
+        1
+      ],
+      "to": [
+        3,
+        3
+      ],
+      "priority": 0.4005557234946728,
+      "checksum": "64a8b22789310453f6131733e37c98d9e450d632f44480b5374c8044b9741b10"
+    },
+    {
+      "block_id": 44,
+      "from": [
+        6,
+        2
+      ],
+      "to": [
+        1,
+        1
+      ],
+      "priority": 0.42734404665489384,
+      "checksum": "404a5a938c55091433ef2c29bec43d48f93e9234f71a8851e9401fc08c540e19"
+    },
+    {
+      "block_id": 45,
+      "from": [
+        6,
+        3
+      ],
+      "to": [
+        3,
+        4
+      ],
+      "priority": 0.23926492778584266,
+      "checksum": "90e37176780ac465cd9e61d6c0b0a7a96d14ed9aaa94861f6fb27a3928c5fe8f"
+    },
+    {
+      "block_id": 46,
+      "from": [
+        6,
+        4
+      ],
+      "to": [
+        6,
+        6
+      ],
+      "priority": 0.2034799874461033,
+      "checksum": "00cfe5afce8f4781f373b944c839917772f51701087a7022e59f288c640c86f3"
+    },
+    {
+      "block_id": 47,
+      "from": [
+        6,
+        5
+      ],
+      "to": [
+        2,
+        5
+      ],
+      "priority": 0.31791684293437394,
+      "checksum": "ff617ef1b50173ad1cefc8069f1babfd59ab063f4b14d0ec8a3ca0382c6e68e7"
+    },
+    {
+      "block_id": 48,
+      "from": [
+        6,
+        6
+      ],
+      "to": [
+        5,
+        5
+      ],
+      "priority": 0.2715036144070197,
+      "checksum": "83829aaa8780140cddb8c4d53c7dbeeacfc74d5c6860a6a70bc289a7f91e873b"
+    }
+  ]
+}

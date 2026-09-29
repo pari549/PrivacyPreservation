@@ -1,0 +1,1 @@
+﻿"""Cache statistics placeholder."""

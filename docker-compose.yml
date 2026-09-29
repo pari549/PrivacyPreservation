@@ -1,0 +1,25 @@
+services:
+  dev:
+    image: privacy-preservation:dev
+    build:
+      context: .
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    working_dir: /workspace/privacy_preservation
+    volumes:
+      - .:/workspace/privacy_preservation
+      - python-cache:/workspace/.cache
+    environment:
+      PYTHONPATH: /workspace/privacy_preservation
+      MPLCONFIGDIR: /workspace/.cache/matplotlib
+    init: true
+    tty: true
+    stdin_open: true
+
+  dev-gpu:
+    extends: dev
+    profiles: [gpu]
+    gpus: all
+
+volumes:
+  python-cache:

@@ -1,0 +1,7 @@
+# Dependencies are installed from the manifests; source, datasets, research
+# results, caches, and key material are supplied by the development bind mount.
+**
+!Dockerfile
+!requirements.txt
+!pyproject.toml
+!README.md
