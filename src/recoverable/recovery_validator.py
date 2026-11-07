@@ -1,22 +1,39 @@
-"""Validate deterministic, dimension-preserving, pixel-perfect recovery."""
+"""Validate authenticated, deterministic, pixel-perfect recovery."""
 from __future__ import annotations
+
 from pathlib import Path
+
 import numpy as np
 
 from src.recoverable.metadata_verifier import verify_recovery_metadata
 from src.recoverable.recovery_engine import recover_image
 from src.preprocessing.data_loader import DEFAULT_LOG_PATH, get_dataset_logger
 
+
 class RecoveryValidationError(ValueError):
     """Raised when recovery inputs, replay, dimensions or pixels fail checks."""
 
-def validate_recovery(perturbed: np.ndarray, recovered: np.ndarray, reference: np.ndarray,
-                      key: bytes, metadata: dict, mappings: list[dict], jaya: dict,
-                      log_path: Path = DEFAULT_LOG_PATH) -> dict[str, object]:
-    """Verify metadata, replay twice, shape preservation and exact source match."""
+
+def validate_recovery(
+    perturbed: np.ndarray,
+    recovered: np.ndarray,
+    reference: np.ndarray,
+    key: bytes,
+    metadata: dict,
+    mappings: list[dict],
+    jaya: dict,
+    feature_matrix: dict,
+    artifact_hashes: dict[str, str],
+    expected_run_id: str | None = None,
+    log_path: Path = DEFAULT_LOG_PATH,
+) -> dict[str, object]:
+    """Recheck bundle bindings, deterministic recovery and exact source pixels."""
     logger = get_dataset_logger(Path(log_path))
     try:
-        if not verify_recovery_metadata(metadata, key, mappings, jaya, Path(log_path)):
+        if not verify_recovery_metadata(
+            metadata, key, mappings, jaya, feature_matrix, artifact_hashes, reference,
+            expected_run_id=expected_run_id, log_path=Path(log_path),
+        ):
             raise RecoveryValidationError("Metadata integrity validation failed")
         perturbed, recovered, reference = np.asarray(perturbed), np.asarray(recovered), np.asarray(reference)
         if perturbed.shape != (28, 28, 3) or recovered.shape != perturbed.shape or reference.shape != perturbed.shape:
@@ -40,6 +57,6 @@ def validate_recovery(perturbed: np.ndarray, recovered: np.ndarray, reference: n
         if isinstance(error, RecoveryValidationError):
             raise
         raise RecoveryValidationError(f"Recovery validation failed: {error}") from error
-    logger.info("Recovery passed metadata, deterministic replay, dimensions, and pixel checks")
+    logger.info("Recovery passed authenticated metadata, replay, dimensions, and pixel checks")
     return {"metadata_verified": True, "deterministic_replay": True,
             "dimensions_unchanged": True, "pixel_perfect": True}

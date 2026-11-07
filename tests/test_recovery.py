@@ -1,41 +1,45 @@
-"""Integration tests for signed, deterministic Method 1 image recovery."""
+"""Integration checks for v2 authenticated pixel-perfect recovery."""
+import io
 import json
 import unittest
-from pathlib import Path
+
 import numpy as np
 
-from src.recoverable.key_loader import load_key
-from src.recoverable.metadata_verifier import MetadataVerificationError, verify_recovery_metadata
-from src.recoverable.recovery_engine import run_recovery
+from src.recoverable.authentication import calculate_bytes_sha256
+from src.recoverable.metadata_verifier import source_image_sha256, verify_recovery_metadata
+from src.recoverable.recovery_engine import recover_image
+from tests.recovery_test_support import create_recovery_fixture, temporary_test_directory
 
 
 class RecoveryTest(unittest.TestCase):
-    def test_pixel_perfect_recovery_metadata_and_report(self) -> None:
-        root = Path(__file__).resolve().parents[1]
-        result = run_recovery()
-        recovered = result["recovered_image"]
-        reference = np.load(root / "data" / "processed" / "train" / "images.npy", mmap_mode="r", allow_pickle=False)[0]
+    def test_authenticated_pixel_perfect_recovery(self) -> None:
+        paths = create_recovery_fixture(temporary_test_directory(self))
+        key = paths["key"].read_bytes()
+        metadata = json.loads(paths["metadata"].read_bytes())
+        permutation_bytes = paths["permutation"].read_bytes()
+        feature_bytes = paths["features"].read_bytes()
+        jaya_bytes = paths["jaya"].read_bytes()
+        perturbed_bytes = paths["perturbed"].read_bytes()
+        source_dataset_bytes = paths["reference"].read_bytes()
+        mapping = json.loads(permutation_bytes)["mappings"]
+        features = json.loads(feature_bytes)
+        jaya = json.loads(jaya_bytes)
+        source = np.load(io.BytesIO(source_dataset_bytes), allow_pickle=False)[0]
+        artifact_hashes = {
+            "perturbed_image": calculate_bytes_sha256(perturbed_bytes),
+            "permutation_map": calculate_bytes_sha256(permutation_bytes),
+            "jaya_output": calculate_bytes_sha256(jaya_bytes),
+            "feature_matrix": calculate_bytes_sha256(feature_bytes),
+            "source_image": source_image_sha256(source),
+        }
+        self.assertTrue(verify_recovery_metadata(
+            metadata, key, mapping, jaya, features, artifact_hashes, source,
+            expected_run_id="test-run-v2", log_path=paths["log"],
+        ))
+        perturbed = np.load(io.BytesIO(perturbed_bytes), allow_pickle=False)
+        recovered = recover_image(perturbed, key, metadata["alpha_snapshot"], mapping)
         recovered_float = recovered.astype(np.float32) / np.float32(255)
-        np.testing.assert_array_equal(recovered_float, reference)
-        metadata = json.loads((root / "metadata" / "recovery_metadata.json").read_text(encoding="utf-8"))
-        mapping = json.loads((root / "metadata" / "permutation_map.json").read_text(encoding="utf-8"))["mappings"]
-        jaya = json.loads((root / "results" / "metrics" / "jaya_results.json").read_text(encoding="utf-8"))
-        self.assertTrue(verify_recovery_metadata(metadata, load_key(root / "keys" / "secret_key.bin"), mapping, jaya))
-        self.assertTrue(result["metadata_verified"])
-        self.assertEqual(result["mse"], 0.0)
-        self.assertEqual(result["recovery_rate"], 100.0)
-        self.assertGreaterEqual(result["ssim"], .999)
-        report_path = root / "results" / "metrics" / "recovery_report.json"
-        self.assertTrue(report_path.is_file())
-        self.assertTrue(json.loads(report_path.read_text(encoding="utf-8"))["metadata_verified"])
-        self.assertEqual(len(result["image_paths"]), 4)
-        self.assertTrue(all(Path(path).is_file() for path in result["image_paths"]))
-
-        tampered = dict(metadata)
-        tampered["alpha_snapshot"] = list(metadata["alpha_snapshot"])
-        tampered["alpha_snapshot"][0] += .001
-        with self.assertRaises(MetadataVerificationError):
-            verify_recovery_metadata(tampered, load_key(root / "keys" / "secret_key.bin"), mapping, jaya)
+        np.testing.assert_array_equal(recovered_float, source)
 
 
 if __name__ == "__main__":

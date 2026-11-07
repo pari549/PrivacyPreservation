@@ -27,6 +27,8 @@ credentials/
 credentials.*
 *_credentials.*
 secrets/
+/.streamlit/secrets.toml
+/.streamlit/secrets.*.toml
 
 # Large source datasets and generated data products
 /data/raw/**
@@ -39,6 +41,10 @@ secrets/
 !/data/recoverable/.gitkeep
 !/data/non_recoverable/.gitkeep
 !/data/recovered/.gitkeep
+
+# Private application-managed recovery bundles
+/.privacyguard_private/
+/private_recoverable_storage/
 
 # Cryptographic key material must be distributed securely, never via Git
 /keys/*

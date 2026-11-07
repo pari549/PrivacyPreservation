@@ -1,13 +1,19 @@
 """Adaptive, deterministic modulo-256 block perturbation engine."""
 from __future__ import annotations
 import hashlib
+import io
 import json
 import math
 import os
+import uuid
 from pathlib import Path
 import numpy as np
 
 from src.recoverable.block_permutation import permute_blocks
+from src.recoverable.authentication import (
+    calculate_bytes_sha256,
+    generate_metadata_hmac,
+)
 from src.recoverable.noise_generator import derive_noise_seed, generate_block_noise
 from src.preprocessing.data_loader import DEFAULT_LOG_PATH, PROJECT_ROOT, get_dataset_logger
 
@@ -84,13 +90,14 @@ def apply_adaptive_perturbation(image: np.ndarray, key: bytes, alpha_snapshot: l
 def save_perturbation_visualizations(original: np.ndarray, perturbed: np.ndarray, noise_field: np.ndarray,
                                      alpha_snapshot: list[float], output_dir: Path) -> list[Path]:
     """Write labeled comparison and consistent-scale perturbation figures."""
-    cache_dir = PROJECT_ROOT / ".cache" / "matplotlib"
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir = output_dir / ".matplotlib_cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     os.environ["MPLCONFIGDIR"] = str(cache_dir)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    output_dir = Path(output_dir); output_dir.mkdir(parents=True, exist_ok=True)
     originals = original.astype(np.float32) / 255.0
     changed = perturbed.astype(np.float32) / 255.0
     magnitude = np.abs(noise_field.astype(np.float32)).mean(axis=2)
@@ -121,29 +128,55 @@ def run_adaptive_perturbation(
     jaya_results_path: Path = DEFAULT_JAYA_PATH, metadata_path: Path = DEFAULT_METADATA_PATH,
     output_path: Path = DEFAULT_OUTPUT_PATH, visualization_dir: Path = DEFAULT_VISUALIZATION_DIR,
     log_path: Path = DEFAULT_LOG_PATH,
+    run_id: str | None = None,
 ) -> dict:
-    """Run once on training image zero, validate replay, and save artifacts."""
+    """Create a v2 authenticated bundle for training image zero."""
     from src.recoverable.key_loader import load_key
     from src.recoverable.permutation_validator import validate_permutation
-    from src.recoverable.perturbation_validator import add_metadata_signature, validate_perturbation
+    from src.recoverable.metadata_verifier import source_image_sha256, verify_recovery_metadata
+    from src.recoverable.perturbation_validator import validate_perturbation
     logger = get_dataset_logger(Path(log_path)); logger.info("Starting adaptive reversible perturbation.")
     key = load_key(Path(key_path))
-    permutation_document = json.loads(Path(permutation_path).read_text(encoding="utf-8"))
+    permutation_bytes = Path(permutation_path).read_bytes()
+    feature_bytes = Path(feature_matrix_path).read_bytes()
+    jaya_bytes = Path(jaya_results_path).read_bytes()
+    source_dataset_path = Path(processed_dir) / "train" / "images.npy"
+    permutation_document = json.loads(permutation_bytes)
     mappings = permutation_document["mappings"]
-    permutation_priorities = [float(item["priority"]) for item in sorted(mappings, key=lambda entry: entry["block_id"])]
-    if not validate_permutation(mappings, key, permutation_priorities, Path(log_path)):
-        raise ValueError("Existing permutation map failed validation")
-    feature_data = json.loads(Path(feature_matrix_path).read_text(encoding="utf-8"))
-    jaya = json.loads(Path(jaya_results_path).read_text(encoding="utf-8"))
+    feature_data = json.loads(feature_bytes)
+    jaya = json.loads(jaya_bytes)
     features = feature_data["samples"][0]["features"]
     weights = jaya["optimized_weights"]
     alpha_base = jaya["optimized_alpha"][:BLOCK_COUNT]
     beta_snapshot = [float(value) for value in jaya["optimized_beta"][:BLOCK_COUNT]]
     if len(beta_snapshot) != BLOCK_COUNT: raise ValueError("Jaya output must contain 49 beta values")
     alpha_snapshot = calculate_alpha_map(features, alpha_base, weights)
-    original = np.load(Path(processed_dir) / "train" / "images.npy", mmap_mode="r", allow_pickle=False)[0]
+    source_dataset = np.load(source_dataset_path, mmap_mode="r", allow_pickle=False)
+    original = np.array(source_dataset[0], copy=True)
+    priorities = [
+        float(weights["variance"]) * float(item["variance"])
+        + float(weights["gradient"]) * float(item["gradient"])
+        + float(weights["entropy"]) * float(item["entropy"])
+        + float(weights["roi"]) * float(item["roi_score"])
+        for item in features
+    ]
+    if not validate_permutation(mappings, key, priorities, Path(log_path)):
+        raise ValueError("Existing permutation map failed validation")
     perturbed, noise_field, original_bytes = apply_adaptive_perturbation(original, key, alpha_snapshot, mappings)
+    perturbed_buffer = io.BytesIO()
+    np.save(perturbed_buffer, perturbed, allow_pickle=False)
+    perturbed_bytes = perturbed_buffer.getvalue()
+    current_run_id = run_id or uuid.uuid4().hex
+    artifact_hashes = {
+        "perturbed_image": calculate_bytes_sha256(perturbed_bytes),
+        "permutation_map": calculate_bytes_sha256(permutation_bytes),
+        "jaya_output": calculate_bytes_sha256(jaya_bytes),
+        "feature_matrix": calculate_bytes_sha256(feature_bytes),
+        "source_image": source_image_sha256(original),
+    }
     metadata = {
+        "schema_version": 2,
+        "run_id": current_run_id,
         "noise_seed": derive_noise_seed(key),
         "alpha_snapshot": alpha_snapshot,
         "beta_snapshot": beta_snapshot,
@@ -154,15 +187,21 @@ def run_adaptive_perturbation(
         "block_count": BLOCK_COUNT,
         "source_split": "train",
         "source_index": 0,
+        "artifacts": artifact_hashes,
     }
-    metadata = add_metadata_signature(metadata)
+    metadata["metadata_hmac"] = generate_metadata_hmac(metadata, key)
     if not validate_perturbation(original, perturbed, key, alpha_snapshot, mappings, metadata, log_path=Path(log_path)):
         raise RuntimeError("Adaptive perturbation validation failed")
+    if not verify_recovery_metadata(
+        metadata, key, mappings, jaya, feature_data, artifact_hashes, original,
+        expected_run_id=current_run_id, log_path=Path(log_path),
+    ):
+        raise RuntimeError("Authenticated recovery bundle validation failed")
     metadata_path, output_path = Path(metadata_path), Path(output_path)
     metadata_path.parent.mkdir(parents=True, exist_ok=True); output_path.parent.mkdir(parents=True, exist_ok=True)
     serialized_metadata = json.dumps(metadata, indent=2) + "\n"
+    output_path.write_bytes(perturbed_bytes)
     metadata_path.write_text(serialized_metadata, encoding="utf-8")
-    np.save(output_path, perturbed, allow_pickle=False)
     visualization_paths = save_perturbation_visualizations(original_bytes, perturbed, noise_field, alpha_snapshot, visualization_dir)
     logger.info("Adaptive perturbation saved to %s; recovery metadata saved to %s", output_path, metadata_path)
     return {"alpha_minimum": min(alpha_snapshot), "alpha_maximum": max(alpha_snapshot),

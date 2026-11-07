@@ -1,10 +1,12 @@
 """Exact recovery for the saved deterministic Method 1 transform."""
 from __future__ import annotations
 import json
+import io
 import os
 from pathlib import Path
 import numpy as np
 from src.recoverable.noise_generator import generate_block_noise
+from src.recoverable.authentication import calculate_bytes_sha256, verify_metadata_hmac
 from src.preprocessing.data_loader import DEFAULT_LOG_PATH, PROJECT_ROOT, get_dataset_logger
 
 GRID_SIZE = 7
@@ -40,30 +42,85 @@ def run_recovery(
     metadata_path: Path = PROJECT_ROOT / "metadata" / "recovery_metadata.json",
     perturbed_path: Path = PROJECT_ROOT / "data" / "recoverable" / "perturbed_image.npy",
     jaya_path: Path = PROJECT_ROOT / "results" / "metrics" / "jaya_results.json",
+    feature_matrix_path: Path = PROJECT_ROOT / "results" / "metrics" / "block_feature_matrix.json",
     reference_path: Path = PROJECT_ROOT / "data" / "processed" / "train" / "images.npy",
     report_path: Path = PROJECT_ROOT / "results" / "metrics" / "recovery_report.json",
     output_dir: Path = PROJECT_ROOT / "results" / "images" / "recovery",
     log_path: Path = DEFAULT_LOG_PATH,
+    expected_run_id: str | None = None,
 ) -> dict:
-    """Verify first, recover solely from signed transform inputs, then evaluate."""
+    """Authenticate one v2 artifact bundle before recovery, then evaluate it.
+
+    Whole-bundle rollback cannot be detected unless ``expected_run_id`` comes
+    from trusted external state; an older complete authenticated bundle remains
+    cryptographically valid on its own.
+    """
     from src.recoverable.key_loader import load_key
-    from src.recoverable.metadata_verifier import verify_recovery_metadata
+    from src.recoverable.metadata_verifier import (
+        MetadataVerificationError,
+        source_image_sha256,
+        verify_recovery_metadata,
+    )
     from src.recoverable.recovery_validator import validate_recovery
     logger = get_dataset_logger(Path(log_path)); logger.info("Starting Method 1 image recovery.")
+
     key = load_key(Path(key_path))
-    metadata = json.loads(Path(metadata_path).read_text(encoding="utf-8"))
-    permutation_document = json.loads(Path(permutation_path).read_text(encoding="utf-8"))
+    metadata_bytes = Path(metadata_path).read_bytes()
+    metadata = json.loads(metadata_bytes)
+    if metadata.get("schema_version") != 2:
+        raise ValueError("Legacy unauthenticated metadata is not accepted by secure recovery")
+    verify_metadata_hmac(metadata, key)
+
+    permutation_bytes = Path(permutation_path).read_bytes()
+    jaya_bytes = Path(jaya_path).read_bytes()
+    feature_bytes = Path(feature_matrix_path).read_bytes()
+    perturbed_bytes = Path(perturbed_path).read_bytes()
+
+    # Reject substituted artifacts before parsing or loading their contents.
+    expected_hashes = metadata.get("artifacts")
+    if not isinstance(expected_hashes, dict):
+        raise MetadataVerificationError("Recovery metadata has no artifact hashes")
+    input_bytes = {
+        "permutation_map": permutation_bytes,
+        "jaya_output": jaya_bytes,
+        "feature_matrix": feature_bytes,
+        "perturbed_image": perturbed_bytes,
+    }
+    input_hashes = {}
+    for name, content in input_bytes.items():
+        actual_hash = calculate_bytes_sha256(content)
+        if expected_hashes.get(name) != actual_hash:
+            raise MetadataVerificationError(f"Recovery {name} artifact hash mismatch")
+        input_hashes[name] = actual_hash
+
+    permutation_document = json.loads(permutation_bytes)
     mappings = permutation_document["mappings"]
-    jaya = json.loads(Path(jaya_path).read_text(encoding="utf-8"))
-    # Stop here on a signature or input-binding failure, before reading image data.
-    if not verify_recovery_metadata(metadata, key, mappings, jaya, Path(log_path)):
+    jaya = json.loads(jaya_bytes)
+    feature_matrix = json.loads(feature_bytes)
+    source_dataset = np.load(Path(reference_path), mmap_mode="r", allow_pickle=False)
+    source_index = metadata.get("source_index")
+    if not isinstance(source_index, int) or isinstance(source_index, bool) or not 0 <= source_index < len(source_dataset):
+        raise ValueError("Recovery metadata has an invalid source image index")
+    reference = np.array(source_dataset[source_index], copy=True)
+    source_mapping = getattr(source_dataset, "_mmap", None)
+    if source_mapping is not None:
+        source_mapping.close()
+    artifact_hashes = {
+        **input_hashes,
+        "source_image": source_image_sha256(reference),
+    }
+    if not verify_recovery_metadata(
+        metadata, key, mappings, jaya, feature_matrix, artifact_hashes, reference,
+        expected_run_id=expected_run_id, log_path=Path(log_path),
+    ):
         raise RuntimeError("Recovery metadata verification failed")
-    perturbed = np.load(Path(perturbed_path), allow_pickle=False)
+    perturbed = np.load(io.BytesIO(perturbed_bytes), allow_pickle=False)
     recovered = recover_image(perturbed, key, metadata["alpha_snapshot"], mappings)
 
-    # Ground truth is opened only after recovery, for the requested honest metrics.
-    reference = np.load(Path(reference_path), mmap_mode="r", allow_pickle=False)[int(metadata["source_index"])]
-    validation = validate_recovery(perturbed, recovered, reference, key, metadata, mappings, jaya, Path(log_path))
+    validation = validate_recovery(
+        perturbed, recovered, reference, key, metadata, mappings, jaya,
+        feature_matrix, artifact_hashes, expected_run_id, Path(log_path),
+    )
     reference_float = np.asarray(reference, dtype=np.float32)
     recovered_float = recovered.astype(np.float32) / np.float32(255.0)
     difference = np.abs(reference_float - recovered_float)
@@ -76,7 +133,7 @@ def run_recovery(
     report = {"ssim": ssim, "psnr": psnr, "mse": mse, "recovery_rate": recovery_rate,
               "metadata_verified": validation["metadata_verified"]}
     output_dir = Path(output_dir); output_dir.mkdir(parents=True, exist_ok=True)
-    cache = PROJECT_ROOT / ".cache" / "matplotlib"; cache.mkdir(parents=True, exist_ok=True)
+    cache = output_dir / ".matplotlib_cache"; cache.mkdir(parents=True, exist_ok=True)
     os.environ["MPLCONFIGDIR"] = str(cache)
     import matplotlib
     matplotlib.use("Agg")
@@ -103,7 +160,7 @@ def run_recovery(
         axis.imshow(image); axis.set_title(title); axis.axis("off")
     axes[1, 0].axis("off"); axes[1, 2].axis("off"); mid = axes[1, 1]; mid.axis("off")
     mid.text(.5, .8, "Recovery pipeline", ha="center", fontsize=14, weight="bold")
-    mid.text(.5, .56, "verify metadata signature", ha="center", bbox={"boxstyle":"round", "facecolor":"#dceeff"})
+    mid.text(.5, .56, "verify metadata HMAC", ha="center", bbox={"boxstyle":"round", "facecolor":"#dceeff"})
     mid.text(.5, .34, "inverse block permutation", ha="center", bbox={"boxstyle":"round", "facecolor":"#e5f5e0"})
     mid.text(.5, .12, "regenerate noise · subtract mod 256", ha="center", bbox={"boxstyle":"round", "facecolor":"#fff2cc"})
     mid.add_patch(FancyArrowPatch((.5,.53),(.5,.44), arrowstyle="->", mutation_scale=12))
