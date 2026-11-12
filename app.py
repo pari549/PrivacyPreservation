@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 import uuid
 
 import streamlit as st
@@ -14,6 +15,7 @@ from src.application.ui_helpers import (
     call_recoverable_recovery,
     call_recoverable_transform,
     inspect_image_upload,
+    load_saved_jaya_result,
     recoverable_service_configuration,
     safe_service_error,
 )
@@ -159,8 +161,8 @@ def _render_non_recoverable() -> None:
         "grayscale images. **No recovery operation is provided.**"
     )
     st.warning(
-        "Global settings are applied uniformly to every block through the adaptive interface. "
-        "Image features are descriptive; they do not select settings or demonstrate privacy effectiveness."
+        "Scalar settings set per-image limits; weighted variance, gradient, entropy, and ROI "
+        "features adapt them per block. This heuristic does not demonstrate privacy effectiveness."
     )
     uploaded = st.file_uploader(
         "Choose a PNG, JPG, or JPEG image",
@@ -179,7 +181,10 @@ def _render_non_recoverable() -> None:
             max_value=MAX_QUANTIZATION_LEVELS,
             value=256,
             step=1,
-            help="Number of evenly spaced quantization values, from 2 to 65,536.",
+            help=(
+                "Upper setting for evenly spaced quantization values. Higher-priority blocks "
+                "use fewer levels, down to 2."
+            ),
         )
         smoothing_strength = st.slider(
             "Gaussian smoothing strength (sigma)",
@@ -187,17 +192,41 @@ def _render_non_recoverable() -> None:
             max_value=MAX_SMOOTHING_STRENGTH,
             value=1.0,
             step=0.1,
-            help="Gaussian kernel sigma in pixels. Zero leaves the smoothing step unchanged.",
+            help=(
+                "Upper setting for Gaussian kernel sigma in pixels. Higher-priority blocks "
+                "receive stronger smoothing. Zero leaves smoothing unchanged."
+            ),
         )
+        jaya_result_path = (
+            Path(__file__).resolve().parent / "results" / "metrics" / "jaya_results.json"
+        )
+        use_jaya_weights = False
+        if jaya_result_path.is_file():
+            use_jaya_weights = st.checkbox(
+                "Use saved Jaya optimized feature weights",
+                value=True,
+                help=(
+                    "Uses variance, gradient, entropy, and ROI weights from the existing "
+                    "Jaya result file. Its objective is illustrative, not a privacy measurement."
+                ),
+            )
+        else:
+            st.caption("No saved Jaya result found; equal feature weights will be used.")
     grayscale = info.is_grayscale
     if st.button("Transform image", key="nonrecoverable_transform"):
         try:
             with st.spinner("Extracting block features and transforming the image…"):
+                feature_weights = (
+                    load_saved_jaya_result(jaya_result_path)
+                    if use_jaya_weights
+                    else None
+                )
                 result = call_non_recoverable_transform(
                     content,
                     quantization_levels=quantization_levels,
                     smoothing_strength=smoothing_strength,
                     grayscale=grayscale,
+                    feature_weights=feature_weights,
                 )
             job_id = uuid.uuid4().hex
             st.session_state["nonrecoverable_result"] = result
@@ -221,9 +250,14 @@ def _render_non_recoverable() -> None:
     metrics[1].metric("PSNR", _format_metric(result.metrics.get("psnr_db"), " dB"))
     metrics[2].metric("SSIM", _format_metric(result.metrics.get("ssim")))
     metrics[3].metric("Processing time", _format_metric(result.processing_time_seconds, " s"))
+    selected_levels = result.transformation_settings["quantization_levels"]["values"]
+    selected_strengths = result.transformation_settings["smoothing_strength"]["values"]
+    weight_source = result.transformation_settings["feature_priority"]["weight_source"]
     st.caption(
-        f"Applied uniformly to each block: {quantization_levels} quantization levels, "
-        f"Gaussian sigma {smoothing_strength:g}. Order: quantization, then smoothing."
+        "Per-block settings adapt to weighted variance, gradient, entropy, and ROI priority. "
+        f"Quantization levels: {min(selected_levels)}–{max(selected_levels)}; "
+        f"Gaussian sigma: {min(selected_strengths):g}–{max(selected_strengths):g}. "
+        f"Weight source: {weight_source}. Order: quantization, then smoothing."
     )
     st.caption(
         f"{result.dimensions[1]} × {result.dimensions[0]} pixels · {result.channels} channel(s) · "

@@ -9,9 +9,21 @@ services:
     volumes:
       - .:/workspace/privacy_preservation
       - python-cache:/workspace/.cache
+      - private-storage:/var/lib/privacy-preservation
+    ports:
+      - "127.0.0.1:8501:8501"
     environment:
       PYTHONPATH: /workspace/privacy_preservation
       MPLCONFIGDIR: /workspace/.cache/matplotlib
+      PRIVACYPRESERVATION_PRIVATE_STORAGE: /var/lib/privacy-preservation
+      STREAMLIT_SERVER_HEADLESS: "true"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    command:
+      - streamlit
+      - run
+      - app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
     init: true
     tty: true
     stdin_open: true
@@ -23,3 +35,4 @@ services:
 
 volumes:
   python-cache:
+  private-storage:

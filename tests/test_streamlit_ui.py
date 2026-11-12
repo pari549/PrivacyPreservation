@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ from src.application.ui_helpers import (
     call_recoverable_recovery,
     call_recoverable_transform,
     inspect_image_upload,
+    load_saved_jaya_result,
     recoverable_service_configuration,
     safe_service_error,
     validate_recoverable_upload,
@@ -32,6 +34,23 @@ def _encoded(array: np.ndarray, format_name: str, mode: str | None = None) -> by
 
 
 class StreamlitUiHelperTest(unittest.TestCase):
+    def test_saved_jaya_result_reader_handles_valid_missing_and_malformed_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "jaya.json"
+            result = {"optimized_weights": {"variance": 0.4, "roi": 0.6}}
+            path.write_text(json.dumps(result), encoding="utf-8")
+            self.assertEqual(load_saved_jaya_result(path), result)
+
+            path.write_text("not json", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "could not be read"):
+                load_saved_jaya_result(path)
+            with self.assertRaisesRegex(ValueError, "could not be read"):
+                load_saved_jaya_result(Path(directory) / "missing.json")
+
+            path.write_text("[]", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "invalid format"):
+                load_saved_jaya_result(path)
+
     def test_upload_validation_for_rgb_png_and_grayscale_jpeg(self) -> None:
         rgb = _encoded(np.zeros((28, 28, 3), dtype=np.uint8), "PNG", "RGB")
         info = inspect_image_upload(rgb, "image.png")
@@ -134,6 +153,29 @@ class StreamlitUiHelperTest(unittest.TestCase):
             quantization_levels=16,
             smoothing_strength=0.5,
             grayscale_image=True,
+        )
+        optimizer_result = {
+            "optimized_weights": {
+                "variance": 0.7,
+                "gradient": 0.1,
+                "entropy": 0.1,
+                "roi": 0.1,
+            }
+        }
+        with patch("src.application.ui_helpers.process_non_recoverable_image") as process:
+            call_non_recoverable_transform(
+                content,
+                quantization_levels=16,
+                smoothing_strength=0.5,
+                grayscale=True,
+                feature_weights=optimizer_result,
+            )
+        process.assert_called_once_with(
+            content,
+            quantization_levels=16,
+            smoothing_strength=0.5,
+            grayscale_image=True,
+            feature_weights=optimizer_result,
         )
         with patch("src.application.ui_helpers.process_non_recoverable_image") as process:
             with self.assertRaises(ValueError):

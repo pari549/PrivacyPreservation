@@ -14,6 +14,7 @@ from src.application.non_recoverable_service import (
     NonRecoverableServiceError,
     process_non_recoverable_image,
 )
+from src.non_recoverable.block_feature_mapper import map_block_features_to_parameters
 from src.non_recoverable.image_input import ImageInputError
 
 
@@ -53,8 +54,24 @@ class NonRecoverableServiceTest(unittest.TestCase):
         self.assertEqual(result.feature_summary["block_count"], 6)
         self.assertEqual(result.feature_summary["block_rows"], 2)
         self.assertEqual(result.feature_summary["block_columns"], 3)
-        self.assertEqual(result.transformation_settings["quantization_levels"]["mode"], "global_uniform")
-        self.assertEqual(result.transformation_settings["smoothing_strength"]["value"], 0.0)
+        quantization = result.transformation_settings["quantization_levels"]
+        smoothing = result.transformation_settings["smoothing_strength"]
+        self.assertEqual(quantization["mode"], "feature_adaptive")
+        self.assertEqual(smoothing["mode"], "feature_adaptive")
+        self.assertEqual(len(quantization["values"]), 6)
+        self.assertEqual(smoothing["values"], [0.0] * 6)
+        self.assertEqual(
+            result.transformation_settings["feature_priority"]["feature_names"],
+            ["variance", "gradient", "entropy", "roi_score"],
+        )
+        self.assertEqual(
+            result.transformation_settings["feature_priority"]["weight_source"],
+            "equal_default",
+        )
+        np.testing.assert_allclose(
+            list(result.transformation_settings["feature_priority"]["weights"].values()),
+            [0.25] * 4,
+        )
         self.assertGreaterEqual(result.processing_time_seconds, 0.0)
         self.assertEqual(set(result.metrics), {"mae", "psnr_db", "ssim"})
         self.assertGreaterEqual(result.metrics["mae"], 0.0)
@@ -88,6 +105,118 @@ class NonRecoverableServiceTest(unittest.TestCase):
         })
         self.assertEqual(result.transformation_settings["smoothing_strength"]["mode"], "per_block")
         self.assertIn("block-boundary", " ".join(result.warnings))
+
+    def test_service_passes_feature_selected_values_to_adaptive_transform(self) -> None:
+        pixels = np.zeros((8, 8, 3), dtype=np.uint8)
+        pixels[:4, 4:] = np.indices((4, 4)).sum(axis=0)[..., None] % 2 * 255
+        pixels[4:, :4] = np.indices((4, 4))[1][..., None] * 60
+        pixels[4:, 4:] = np.random.default_rng(5).integers(
+            0, 256, size=(4, 4, 3), dtype=np.uint8
+        )
+
+        from src.non_recoverable.adaptive_transformations import adaptive_combined_transformation
+
+        with patch(
+            "src.application.non_recoverable_service.adaptive_combined_transformation",
+            wraps=adaptive_combined_transformation,
+        ) as transform:
+            result = self.process(pixels, quantization_levels=64, smoothing_strength=8.0)
+
+        levels = result.transformation_settings["quantization_levels"]["values"]
+        strengths = result.transformation_settings["smoothing_strength"]["values"]
+        self.assertGreater(len(set(levels)), 1)
+        self.assertGreater(len(set(strengths)), 1)
+        self.assertEqual(transform.call_args.args[1], levels)
+        self.assertEqual(transform.call_args.args[2], strengths)
+
+    def test_service_passes_jaya_weights_to_mapper_and_applies_them(self) -> None:
+        pixels = np.zeros((8, 8, 3), dtype=np.uint8)
+        pixels[:4, :4] = np.indices((4, 4)).sum(axis=0)[..., None] % 2 * 255
+        pixels[:4, 4:] = np.indices((4, 4))[1][..., None] * 60
+        pixels[4:, :4] = np.random.default_rng(19).integers(
+            0, 256, size=(4, 4, 3), dtype=np.uint8
+        )
+        variance_optimizer_result = {
+            "optimized_weights": {
+                "variance": 0.7,
+                "gradient": 0.1,
+                "entropy": 0.1,
+                "roi": 0.1,
+            }
+        }
+        roi_optimizer_result = {
+            "optimized_weights": {
+                "variance": 0.1,
+                "gradient": 0.1,
+                "entropy": 0.1,
+                "roi": 0.7,
+            }
+        }
+
+        with patch(
+            "src.application.non_recoverable_service.map_block_features_to_parameters",
+            wraps=map_block_features_to_parameters,
+        ) as mapper:
+            variance_result = self.process(
+                pixels,
+                quantization_levels=64,
+                smoothing_strength=8.0,
+                feature_weights=variance_optimizer_result,
+            )
+            roi_result = self.process(
+                pixels,
+                quantization_levels=64,
+                smoothing_strength=8.0,
+                feature_weights=roi_optimizer_result,
+            )
+
+        self.assertEqual(mapper.call_count, 2)
+        self.assertEqual(
+            mapper.call_args_list[0].kwargs["feature_weights"], variance_optimizer_result
+        )
+        self.assertEqual(
+            mapper.call_args_list[1].kwargs["feature_weights"], roi_optimizer_result
+        )
+        variance_priority = variance_result.transformation_settings["feature_priority"]
+        roi_priority = roi_result.transformation_settings["feature_priority"]
+        self.assertEqual(variance_priority["weight_source"], "jaya_optimizer")
+        self.assertEqual(roi_priority["weight_source"], "jaya_optimizer")
+        self.assertEqual(variance_priority["weights"]["variance"], 0.7)
+        self.assertEqual(roi_priority["weights"]["roi_score"], 0.7)
+        self.assertNotEqual(variance_priority["values"], roi_priority["values"])
+        self.assertNotEqual(
+            variance_result.transformation_settings["quantization_levels"]["values"],
+            roi_result.transformation_settings["quantization_levels"]["values"],
+        )
+        self.assertNotEqual(
+            variance_result.transformation_settings["smoothing_strength"]["values"],
+            roi_result.transformation_settings["smoothing_strength"]["values"],
+        )
+
+    def test_invalid_optimizer_weights_are_rejected_before_transformation(self) -> None:
+        pixels = np.zeros((4, 4, 3), dtype=np.uint8)
+        invalid_results = (
+            {"optimized_weights": {"variance": 0.7}},
+            {
+                "optimized_weights": {
+                    "variance": 0.7,
+                    "gradient": 0.1,
+                    "entropy": float("nan"),
+                    "roi": 0.1,
+                }
+            },
+        )
+        for optimizer_result in invalid_results:
+            with self.subTest(optimizer_result=optimizer_result), patch(
+                "src.application.non_recoverable_service.adaptive_combined_transformation"
+            ) as transform, self.assertRaises(ValueError):
+                self.process(
+                    pixels,
+                    quantization_levels=16,
+                    smoothing_strength=0.5,
+                    feature_weights=optimizer_result,
+                )
+            transform.assert_not_called()
 
     def test_invalid_image_bytes_and_empty_inputs_are_rejected(self) -> None:
         for invalid in (b"not an image", b""):

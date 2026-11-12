@@ -7,7 +7,7 @@ handling, or recovery operation.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from io import BytesIO
 import math
@@ -24,13 +24,19 @@ from src.evaluation.non_recoverable_metrics import (
     peak_signal_to_noise_ratio,
     structural_similarity,
 )
-from src.non_recoverable.adaptive_transformations import adaptive_combined_transformation
+from src.non_recoverable.adaptive_transformations import (
+    adaptive_combined_transformation,
+)
+from src.non_recoverable.block_feature_mapper import map_block_features_to_parameters
 from src.non_recoverable.baseline_transformations import (
     MAX_QUANTIZATION_LEVELS,
     MAX_SMOOTHING_STRENGTH,
     MIN_QUANTIZATION_LEVELS,
 )
-from src.non_recoverable.feature_matrix import ImageFeatureMatrix, extract_feature_matrix
+from src.non_recoverable.feature_matrix import (
+    ImageFeatureMatrix,
+    extract_feature_matrix,
+)
 from src.non_recoverable.image_input import (
     DEFAULT_MAX_IMAGE_PIXELS,
     PreparedImage,
@@ -138,6 +144,14 @@ def _smoothing_values(value: object, block_count: int) -> tuple[list[float], dic
     return strengths, {"mode": "per_block", "values": strengths.copy()}
 
 
+def _is_quantization_scalar(value: object) -> bool:
+    return isinstance(value, numbers.Integral) and not isinstance(value, (bool, np.bool_))
+
+
+def _is_smoothing_scalar(value: object) -> bool:
+    return isinstance(value, numbers.Real) and not isinstance(value, (bool, np.bool_))
+
+
 def _encode_png(image: np.ndarray) -> bytes:
     pixels = np.clip(np.rint(np.asarray(image, dtype=np.float64) * 255.0), 0, 255).astype(np.uint8)
     if pixels.ndim == 2:
@@ -178,14 +192,14 @@ def process_non_recoverable_image(
     block_size: int = 4,
     grayscale_image: bool | None = None,
     max_image_pixels: int = DEFAULT_MAX_IMAGE_PIXELS,
+    feature_weights: Sequence[float] | Mapping[str, object] | None = None,
 ) -> NonRecoverableImageResult:
-    """Process one uploaded image using explicit global or per-block settings.
+    """Process one upload using scalar setting ceilings or per-block settings.
 
-    Global values are expanded to every row-major image block and are labeled
-    ``global_uniform`` in the result. Per-block sequences must have one value
-    per block. Feature extraction is descriptive only; it does not select
-    transformation parameters. The transformed preview is normalized float32;
-    ``transformed_image_bytes`` is an explicitly quantized PNG representation.
+    Scalar values are maximum per-image settings and are adapted per block
+    using the existing Jaya priority features. Explicit per-block sequences
+    retain their supplied values. The transformed preview is normalized
+    float32; ``transformed_image_bytes`` is an explicitly quantized PNG.
     """
     started = time.perf_counter()
     content = _read_upload(image)
@@ -205,8 +219,51 @@ def process_non_recoverable_image(
         block_count = math.ceil(height / block_size) * math.ceil(width / block_size)
         if matrix.values.shape[0] != block_count:
             raise ValueError("feature rows do not match the loaded image block geometry")
-        levels, level_record = _quantization_values(quantization_levels, block_count)
-        strengths, strength_record = _smoothing_values(smoothing_strength, block_count)
+        quantization_is_scalar = _is_quantization_scalar(quantization_levels)
+        smoothing_is_scalar = _is_smoothing_scalar(smoothing_strength)
+        if feature_weights is not None and not (
+            quantization_is_scalar or smoothing_is_scalar
+        ):
+            raise ValueError(
+                "feature_weights require at least one scalar setting to adapt"
+            )
+        if quantization_is_scalar or smoothing_is_scalar:
+            mapped = map_block_features_to_parameters(
+                matrix,
+                quantization_levels=(
+                    int(quantization_levels) if quantization_is_scalar else None
+                ),
+                smoothing_strength=(
+                    float(smoothing_strength) if smoothing_is_scalar else None
+                ),
+                feature_weights=feature_weights,
+            )
+        else:
+            mapped = None
+
+        if quantization_is_scalar:
+            levels = list(mapped.levels_per_block)
+            level_record = {
+                "mode": "feature_adaptive",
+                "base_value": int(quantization_levels),
+                "priority_feature_names": list(mapped.feature_names),
+                "scaled_priorities": list(mapped.scaled_priorities),
+                "values": levels.copy(),
+            }
+        else:
+            levels, level_record = _quantization_values(quantization_levels, block_count)
+
+        if smoothing_is_scalar:
+            strengths = list(mapped.strengths_per_block)
+            strength_record = {
+                "mode": "feature_adaptive",
+                "base_value": float(smoothing_strength),
+                "priority_feature_names": list(mapped.feature_names),
+                "scaled_priorities": list(mapped.scaled_priorities),
+                "values": strengths.copy(),
+            }
+        else:
+            strengths, strength_record = _smoothing_values(smoothing_strength, block_count)
         transformed = adaptive_combined_transformation(
             prepared,
             levels,
@@ -233,7 +290,8 @@ def process_non_recoverable_image(
         )
 
     warnings: list[str] = [
-        "Feature extraction does not determine transformation settings or establish privacy effectiveness.",
+        "Feature priorities adapt scalar settings per block; this heuristic does not "
+        "establish privacy effectiveness.",
         "The transformation is lossy; no inverse or recovery operation is provided.",
     ]
     if len(set(strengths)) > 1:
@@ -260,6 +318,23 @@ def process_non_recoverable_image(
         "quantization_levels": level_record,
         "smoothing_strength": strength_record,
     }
+    if mapped is not None:
+        if feature_weights is None:
+            weight_source = "equal_default"
+        elif isinstance(feature_weights, Mapping) and (
+            "optimized_weights" in feature_weights or "weights" in feature_weights
+        ):
+            weight_source = "jaya_optimizer"
+        else:
+            weight_source = "supplied_feature_weights"
+        settings["feature_priority"] = {
+            "method": "weighted Jaya block priority scaled by priority / (1 + max priority)",
+            "feature_names": list(mapped.feature_names),
+            "values": list(mapped.priorities),
+            "scaled_values": list(mapped.scaled_priorities),
+            "weights": dict(zip(mapped.feature_names, mapped.feature_weights)),
+            "weight_source": weight_source,
+        }
     return NonRecoverableImageResult(
         original_image=prepared.image.copy(),
         transformed_image=np.asarray(transformed).copy(),

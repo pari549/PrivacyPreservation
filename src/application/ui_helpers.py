@@ -1,8 +1,10 @@
 """Small, testable validation and service-call helpers for the Streamlit UI."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from io import BytesIO
+import json
 import os
 from pathlib import Path
 from typing import Mapping
@@ -28,6 +30,17 @@ class UploadValidationError(ValueError):
 
 class RecoverableConfigurationError(RuntimeError):
     """Server-side recovery storage or key configuration is incomplete."""
+
+
+def load_saved_jaya_result(path: str | Path) -> dict[str, object]:
+    """Load a saved optimizer output document, rejecting missing or malformed files."""
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError("The saved Jaya optimizer result could not be read.") from error
+    if not isinstance(payload, dict):
+        raise ValueError("The saved Jaya optimizer result has an invalid format.")
+    return payload
 
 
 @dataclass(frozen=True)
@@ -167,8 +180,9 @@ def call_non_recoverable_transform(
     quantization_levels: int,
     smoothing_strength: float,
     grayscale: bool,
+    feature_weights: Mapping[str, object] | Sequence[float] | None = None,
 ):
-    """Validate the UI's global settings and call the existing service API."""
+    """Validate scalar setting ceilings and call the existing service API."""
     if isinstance(quantization_levels, bool) or not isinstance(quantization_levels, int):
         raise ValueError("Quantization levels must be an integer.")
     if not MIN_QUANTIZATION_LEVELS <= quantization_levels <= MAX_QUANTIZATION_LEVELS:
@@ -180,12 +194,14 @@ def call_non_recoverable_transform(
         raise ValueError("Smoothing strength must be numeric.")
     if not 0 <= float(smoothing_strength) <= MAX_SMOOTHING_STRENGTH:
         raise ValueError("Smoothing strength is outside the supported range.")
-    return process_non_recoverable_image(
-        content,
-        quantization_levels=quantization_levels,
-        smoothing_strength=float(smoothing_strength),
-        grayscale_image=grayscale,
-    )
+    arguments = {
+        "quantization_levels": quantization_levels,
+        "smoothing_strength": float(smoothing_strength),
+        "grayscale_image": grayscale,
+    }
+    if feature_weights is not None:
+        arguments["feature_weights"] = feature_weights
+    return process_non_recoverable_image(content, **arguments)
 
 
 def safe_service_error(error: Exception, *, mode: str) -> str:

@@ -5,6 +5,8 @@ ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=180 \
+    PIP_RETRIES=10 \
     MPLCONFIGDIR=/workspace/.cache/matplotlib
 
 WORKDIR /workspace/privacy_preservation

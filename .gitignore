@@ -98,3 +98,5 @@ desktop.ini
 # Docker local overrides and state
 docker-compose.override.yml
 .docker/
+
+.venv311/
